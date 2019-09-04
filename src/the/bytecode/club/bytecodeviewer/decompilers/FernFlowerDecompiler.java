@@ -12,8 +12,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.objectweb.asm.tree.ClassNode;
 
 import the.bytecode.club.bytecodeviewer.BytecodeViewer;
-import the.bytecode.club.bytecodeviewer.JarUtils;
-import the.bytecode.club.bytecodeviewer.MiscUtils;
+import the.bytecode.club.bytecodeviewer.util.MiscUtils;
 import the.bytecode.club.bytecodeviewer.Resources;
 
 /***************************************************************************
@@ -44,34 +43,31 @@ import the.bytecode.club.bytecodeviewer.Resources;
 public class FernFlowerDecompiler extends Decompiler {
 
     @Override
-    public void decompileToZip(String zipName) {
-        File tempZip = new File(BytecodeViewer.tempDirectory + "temp.zip");
-        if (tempZip.exists())
-            tempZip.delete();
+    public void decompileToZip(String sourceJar, String zipName) {
+        File tempZip = new File(sourceJar);
 
-        File f = new File(BytecodeViewer.tempDirectory + BytecodeViewer.fs
-                + "temp" + BytecodeViewer.fs);
+        File f = new File(BytecodeViewer.tempDirectory + BytecodeViewer.fs + "temp" + BytecodeViewer.fs);
         f.mkdir();
 
-        JarUtils.saveAsJar(BytecodeViewer.getLoadedClasses(),
-                tempZip.getAbsolutePath());
+        try
+        {
+            org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler.main(generateMainMethod(tempZip.getAbsolutePath(), BytecodeViewer.tempDirectory + "./temp/"));
+        }
+        catch(StackOverflowError | Exception e)
+        {
 
-        org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler.main(generateMainMethod(tempZip.getAbsolutePath(), BytecodeViewer.tempDirectory + "./temp/"));
+        }
 
-        File tempZip2 = new File(BytecodeViewer.tempDirectory
-                + BytecodeViewer.fs + "temp" + BytecodeViewer.fs
-                + tempZip.getName());
+        File tempZip2 = new File(BytecodeViewer.tempDirectory + BytecodeViewer.fs + "temp" + BytecodeViewer.fs + tempZip.getName());
         if (tempZip2.exists())
             tempZip2.renameTo(new File(zipName));
 
-        tempZip.delete();
-        new File(BytecodeViewer.tempDirectory + BytecodeViewer.fs + "temp")
-                .delete();
+        f.delete();
     }
 
     @Override
     public String decompileClassNode(final ClassNode cn, byte[] b) {
-        String start = MiscUtils.getUniqueName("", ".class");
+        String start = BytecodeViewer.tempDirectory + BytecodeViewer.fs+MiscUtils.getUniqueName("", ".class");
 
         final File tempClass = new File(start + ".class");
 
@@ -87,15 +83,15 @@ public class FernFlowerDecompiler extends Decompiler {
             e.printStackTrace(new PrintWriter(sw));
             e.printStackTrace();
 
-            exception = "Bytecode Viewer Version: " + BytecodeViewer.version + BytecodeViewer.nl + BytecodeViewer.nl + sw.toString();
+            exception = "Bytecode Viewer Version: " + BytecodeViewer.VERSION + BytecodeViewer.nl + BytecodeViewer.nl + sw.toString();
         }
 
 
-        if (!BytecodeViewer.fatJar) {
+        if (!BytecodeViewer.FAT_JAR) {
             try {
                 ProcessBuilder pb = new ProcessBuilder(ArrayUtils.addAll(
                         new String[]{BytecodeViewer.getJavaCommand(), "-jar", Resources.findLibrary("fernflower")},
-                        generateMainMethod(tempClass.getAbsolutePath(), ".")
+                        generateMainMethod(tempClass.getAbsolutePath(), new File(BytecodeViewer.tempDirectory).getAbsolutePath())
                 ));
                 BytecodeViewer.sm.stopBlocking();
                 Process p = pb.start();
@@ -106,9 +102,23 @@ public class FernFlowerDecompiler extends Decompiler {
             } finally {
                 BytecodeViewer.sm.setBlocking();
             }
-        } else
-            org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler.main(
-                    generateMainMethod(tempClass.getAbsolutePath(), "."));
+        }
+        else
+        {
+            try
+            {
+                org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler.main(generateMainMethod(tempClass.getAbsolutePath(),
+                        new File(BytecodeViewer.tempDirectory).getAbsolutePath()));
+            }
+            catch(StackOverflowError | Exception e)
+            {
+                StringWriter sw = new StringWriter();
+                e.printStackTrace(new PrintWriter(sw));
+                e.printStackTrace();
+
+                exception = "Bytecode Viewer Version: " + BytecodeViewer.VERSION + BytecodeViewer.nl + BytecodeViewer.nl + sw.toString();
+            }
+        }
 
         tempClass.delete();
 
